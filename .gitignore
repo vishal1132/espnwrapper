@@ -1,0 +1,8 @@
+# my personal reference docs
+# of no use for anyone else.
+*.txt
+
+
+# binary
+score
+score.exe
