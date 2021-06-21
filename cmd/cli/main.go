@@ -1,12 +1,9 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
-	"os"
 	"sync"
-	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
@@ -24,39 +21,47 @@ func main() {
 		e: espn.New(),
 		// wg: &sync.WaitGroup{},
 	}
-	c.initScreen()
-	// flags for the cli
-	interval := flag.Int("refresh", 2, "refresh interval to refresh the score. Default interval is 2 seconds")
-	matchID := flag.String("matchid", "1249875", "matchid extract from espncricinfo")
-	flag.Parse()
-	// flags for cli over
-	t := time.Tick(time.Duration(*interval) * time.Second)
-	c.s.Clear()
-	// c.wg.Add(1)
-	// var matchID string = "1263150"
-	go func() {
-		for {
-			select {
-			case <-t:
-				c.printMatchSummary(*matchID)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-			}
-		}
-	}()
-	for {
-		switch ev := c.s.PollEvent().(type) {
-		case *tcell.EventResize:
-			c.s.Sync()
-			c.printMatchSummary(*matchID)
-		case *tcell.EventKey:
-			if ev.Key() == tcell.KeyESC {
-				c.s.Fini()
-				// c.wg.Done()
-				os.Exit(0)
-			}
-		}
+	_, err := c.e.GetAllMatches()
+	if err != nil {
+		log.Println(err)
 	}
 
+	/*
+		c.initScreen()
+		// flags for the cli
+		interval := flag.Int("refresh", 2, "refresh interval to refresh the score. Default interval is 2 seconds")
+		matchID := flag.String("matchid", "1249875", "matchid extract from espncricinfo")
+		flag.Parse()
+		// flags for cli over
+		t := time.Tick(time.Duration(*interval) * time.Second)
+		c.s.Clear()
+		// c.wg.Add(1)
+		// var matchID string = "1263150"
+		go func() {
+			for {
+				select {
+				case <-t:
+					c.printMatchSummary(*matchID)
+
+				}
+			}
+		}()
+		for {
+			switch ev := c.s.PollEvent().(type) {
+			case *tcell.EventResize:
+				c.s.Sync()
+				c.printMatchSummary(*matchID)
+			case *tcell.EventKey:
+				if ev.Key() == tcell.KeyESC {
+					c.s.Fini()
+					// c.wg.Done()
+					os.Exit(0)
+				}
+			}
+		}
+	*/
 	// c.wg.Wait()
 }
 
