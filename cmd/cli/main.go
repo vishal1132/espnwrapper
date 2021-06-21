@@ -1,9 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
@@ -11,9 +14,11 @@ import (
 )
 
 type CLI struct {
-	s  tcell.Screen
-	e  *espn.ESPN
-	wg *sync.WaitGroup
+	s       tcell.Screen
+	e       *espn.ESPN
+	wg      *sync.WaitGroup
+	refresh int
+	matchid string
 }
 
 func main() {
@@ -23,46 +28,87 @@ func main() {
 	}
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	_, err := c.e.GetAllMatches()
+	c.initScreen()
+	// flags for the cli
+	interval := flag.Int("refresh", 2, "refresh interval to refresh the score. Default interval is 2 seconds")
+	flag.Parse()
+	c.refresh = *interval
+	// flags for cli over
+	c.s.Clear()
+	matches, err := c.e.GetAllMatches()
 	if err != nil {
 		log.Println(err)
 	}
+	c.showMatches(matches)
 
-	/*
-		c.initScreen()
-		// flags for the cli
-		interval := flag.Int("refresh", 2, "refresh interval to refresh the score. Default interval is 2 seconds")
-		matchID := flag.String("matchid", "1249875", "matchid extract from espncricinfo")
-		flag.Parse()
-		// flags for cli over
-		t := time.Tick(time.Duration(*interval) * time.Second)
-		c.s.Clear()
-		// c.wg.Add(1)
-		// var matchID string = "1263150"
-		go func() {
-			for {
-				select {
-				case <-t:
-					c.printMatchSummary(*matchID)
+	// c.wg.Wait()
+}
 
-				}
+func (c *CLI) showMatches(matches *[]espn.ESPNMatchDescription) {
+	c.s.Clear()
+	nh := 0
+	w, _ := c.s.Size()
+	for i, v := range *matches {
+		emitStr(c.s, 0, nh, tcell.StyleDefault, fmt.Sprintf("Match Number %d:", i+1))
+		nh++
+		emitStr(c.s, 0, nh, tcell.StyleDefault, fmt.Sprintf("%s vs %s", v.TeamA, v.TeamB))
+		nh++
+		emitStr(c.s, 0, nh, tcell.StyleDefault, v.Description)
+		nh += 2
+	}
+	emitStr(c.s, w/2-15, nh, tcell.StyleDefault, "Enter match number to follow or escape to exit.")
+	c.s.Show()
+	for {
+		switch ev := c.s.PollEvent().(type) {
+		case *tcell.EventResize:
+			c.s.Sync()
+			// displayHelloWorld(s)
+		case *tcell.EventKey:
+			if ev.Key() == tcell.KeyESC {
+				c.s.Fini()
+				// c.wg.Done()
+				os.Exit(0)
 			}
-		}()
+
+			if ev.Rune() == 0 {
+				//no op
+				continue
+			}
+			if int(ev.Rune())-49 >= len(*matches) || ev.Rune()-49 < 0 {
+				emitStr(c.s, 0, nh+1, tcell.StyleDefault, "Please enter a valid match number")
+				continue
+			}
+			c.matchid = (*matches)[ev.Rune()-49].MatchID
+			c.showScore()
+		}
+	}
+}
+
+func (c *CLI) showScore() {
+	t := time.Tick(time.Duration(c.refresh) * time.Second)
+	go func() {
 		for {
-			switch ev := c.s.PollEvent().(type) {
-			case *tcell.EventResize:
-				c.s.Sync()
-				c.printMatchSummary(*matchID)
-			case *tcell.EventKey:
-				if ev.Key() == tcell.KeyESC {
-					c.s.Fini()
-					// c.wg.Done()
-					os.Exit(0)
-				}
+			select {
+			case <-t:
+				c.printMatchSummary(c.matchid)
+
 			}
 		}
-	*/
-	// c.wg.Wait()
+	}()
+	for {
+		switch ev := c.s.PollEvent().(type) {
+		case *tcell.EventResize:
+			c.s.Sync()
+			c.printMatchSummary(c.matchid)
+		case *tcell.EventKey:
+			if ev.Key() == tcell.KeyESC {
+				c.s.Fini()
+				// c.wg.Done()
+				os.Exit(0)
+			}
+		}
+	}
+
 }
 
 func (c *CLI) printMatchSummary(matchID string) {

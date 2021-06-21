@@ -2,7 +2,6 @@
 package espn
 
 import (
-	"log"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -28,7 +27,6 @@ type ESPNMatchDescription struct {
 	MatchID     string
 	TeamA       string
 	TeamB       string
-	Teams       []string
 	Description string
 	Link        string
 	Status      string
@@ -95,24 +93,13 @@ func extractMatch(n *html.Node) ESPNMatchDescription {
 	for _, attr := range n.Attr {
 		if attr.Key == "href" {
 			match.Link = attr.Val
-			match.MatchID = extractMatchIDFromLink(match.Link)
+			match.extractMatchIDFromLink()
 			break
 		}
 	}
 	match.Description = extractDescriptionInfo(n, "")
-	match.Teams = extractTeamInfo(n, make([]string, 0))
+	// match.Teams = extractTeamInfo(n, make([]string, 0))
 	return match
-}
-
-func extractTeamInfo(n *html.Node, teams []string) []string {
-	if n.Type == html.ElementNode && n.Data == "div" {
-		log.Println("attr ", n.Attr)
-		// log.Printf("pointerrrrrrrrrr %p", n)
-	}
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		teams = extractTeamInfo(c, teams)
-	}
-	return teams
 }
 
 func extractDescriptionInfo(n *html.Node, description string) string {
@@ -147,8 +134,15 @@ func extractText(n *html.Node, text string) string {
 	return strings.TrimSpace(text)
 }
 
-func extractMatchIDFromLink(link string) string {
-	paths := strings.Split(link, "/")
+func (m *ESPNMatchDescription) extractMatchIDFromLink() {
+	paths := strings.Split(m.Link, "/")
 	dashes := strings.Split(paths[len(paths)-2], "-")
-	return dashes[len(dashes)-1]
+	m.MatchID = dashes[len(dashes)-1]
+	for i, v := range dashes {
+		if v == "vs" {
+			m.TeamA = strings.Join(dashes[:i], " ")
+			m.TeamB = strings.Join(dashes[i+1:len(dashes)-2], " ")
+			break
+		}
+	}
 }
